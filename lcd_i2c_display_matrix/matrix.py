@@ -3,104 +3,6 @@ from threading import Thread, Event
 from queue import Queue
 from time import sleep
 
-# Example Dict
-# display_data = [
-#     {"location": (0, 0), "identifier": 0x20},
-#     {"location": (1, 0), "identifier": 0x26}
-# ]
-
-
-class LCDMatrix:
-    def __init__(self, display_data: list) -> None:
-        """
-            Create the Matrix.
-            location must be a tuple with containing x, y of the display in
-            the matrix. The identifier is the LCDs controll board identifier
-        """
-        self.displays = []
-        self.get_displays(display_data)
-        self.last_used = self.displays[0][0]
-
-    def display_on_next(self, lines: list, data_id: str) -> None:
-        """
-            Display text on the next available display.
-            If there is an display already got the same id then use it
-            otherwise use the next unlocked display after the last used one
-        """
-        data_id_display = None
-        next_display = None
-        next_use = False
-        for row in self.displays:
-            for display in row:
-                if not display:
-                    # If on this spot there is no display set
-                    # then check the next one display instead
-                    continue
-                if display.data_id == data_id:
-                    data_id_display = display
-                if next_use and not display.locked_display:
-                    next_display = display
-                    next_use = False
-                if display == self.last_used:
-                    next_use = True
-        if not next_display and not data_id_display:
-            # No active display to display data on
-            # Just return and do not display the data
-            return
-        if data_id_display:
-            # Display the text on the already used display
-            data_id_display.set_text(line1=lines[0], line2=lines[1])
-            return
-        if next_display:
-            # Display the text on the next available Display
-            # set the correct data_id so it can be found again
-            # set it as the last used one
-            if not next_display.is_on():
-                next_display.toggle_display()
-            next_display.set_text(line1=lines[0], line2=lines[1])
-            next_display.data_id = data_id
-            self.last_used = next_display
-            return
-
-    def self_test(self) -> None:
-        """ Selftesting
-            Display Identifier on first line
-            Display location on second lin
-        """
-        for row in self.displays:
-            for display in row:
-                if not display.is_on():
-                    display.toggle_display()
-                display.set_text(
-                    line1=f"ID : {hex(display.identifier)}",
-                    line2=f"Loc: {display.location}"
-                )
-
-    def get_displays(self, setup_data: list) -> None:
-        """
-            Init all displays. If there are spots without a display on the
-            grid its value will be set to `None`.
-        """
-        for display in setup_data:
-            if "identifier" not in display or "location" not in display:
-                # NOTE: if identifier or location is missing just continue
-                continue
-            x, y = display["location"]
-            while len(self.displays) < x + 1:
-                self.displays.append([])
-            while len(self.displays[x]) < y + 1:
-                self.displays[x].append(None)
-            self.displays[x][y] = Display(
-                display["identifier"],
-                display["location"],
-            )
-
-    def exit(self) -> None:
-        for row in self.displays:
-            for display in row:
-                if display.is_on():
-                    display.toggle_display()
-
 
 class Display:
     def __init__(self, identifier: hex, location: tuple) -> None:
@@ -214,3 +116,112 @@ class Display:
                     current_lines[1] = new_lines[1]
             else:
                 sleep(.1)
+
+# Example Dict
+# display_data = [
+#     {"location": (0, 0), "identifier": 0x20},
+#     {"location": (1, 0), "identifier": 0x26}
+# ]
+
+
+class LCDMatrix:
+    def __init__(self, display_data: list) -> None:
+        """
+            Create the Matrix.
+            location must be a tuple with containing x, y of the display in
+            the matrix. The identifier is the LCDs controll board identifier
+        """
+        self.displays = []
+        self.get_displays(display_data)
+        self.last_used = self.displays[-1][-1]
+
+    def display_on_next(self, lines: list, data_id: str) -> None:
+        """
+            Display text on the next available display.
+            If there is an display already got the same id then use it
+            otherwise use the next unlocked display after the last used one
+        """
+        data_id_display = self.get_data_id_display(data_id)
+        if data_id_display:
+            # Display the text on the already used display
+            data_id_display.set_text(line1=lines[0], line2=lines[1])
+            return
+
+        next_display = self.get_next_unused_display()
+        if not next_display:
+            # No possible next display found.
+            # skip displaying
+            return
+        if next_display:
+            # Display the text on the next available Display
+            # set the correct data_id so it can be found again
+            # set it as the last used one
+            if not next_display.is_on():
+                next_display.toggle_display()
+            next_display.set_text(line1=lines[0], line2=lines[1])
+            next_display.data_id = data_id
+            self.last_used = next_display
+            return
+
+    def get_next_unused_display(self) -> Display:
+        display_list = []
+        for row in self.displays:
+            for display in row:
+                display_list.append(display)
+        tmp_list = []
+        while len(display_list) > 0 and len(tmp_list) < 2:
+            for display in display_list:
+                if display.locked_display:
+                    display_list.remove(display)
+                if len(tmp_list) == 0 and display != self.last_used:
+                    continue
+                tmp_list.append(display)
+        if len(tmp_list) == 1:
+            return None
+        return tmp_list[1]
+
+    def get_data_id_display(self, data_id) -> Display:
+        for row in self.displays:
+            for display in row:
+                if display.data_id == data_id:
+                    return display
+        return None
+
+    def self_test(self) -> None:
+        """ Selftesting
+            Display Identifier on first line
+            Display location on second lin
+        """
+        for row in self.displays:
+            for display in row:
+                if not display.is_on():
+                    display.toggle_display()
+                display.set_text(
+                    line1=f"ID : {hex(display.identifier)}",
+                    line2=f"Loc: {display.location}"
+                )
+
+    def get_displays(self, setup_data: list) -> None:
+        """
+            Init all displays. If there are spots without a display on the
+            grid its value will be set to `None`.
+        """
+        for display in setup_data:
+            if "identifier" not in display or "location" not in display:
+                # NOTE: if identifier or location is missing just continue
+                continue
+            x, y = display["location"]
+            while len(self.displays) < x + 1:
+                self.displays.append([])
+            while len(self.displays[x]) < y + 1:
+                self.displays[x].append(None)
+            self.displays[x][y] = Display(
+                display["identifier"],
+                display["location"],
+            )
+
+    def exit(self) -> None:
+        for row in self.displays:
+            for display in row:
+                if display.is_on():
+                    display.toggle_display()
