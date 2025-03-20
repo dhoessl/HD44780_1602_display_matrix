@@ -95,6 +95,12 @@ class LCDMatrix:
                 display["location"],
             )
 
+    def exit(self) -> None:
+        for row in self.displays:
+            for display in row:
+                if display.is_on():
+                    display.toggle_display()
+
 
 class Display:
     def __init__(self, identifier: hex, location: tuple) -> None:
