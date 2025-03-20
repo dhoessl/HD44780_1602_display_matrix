@@ -8,7 +8,7 @@ setup(
     author="Dominic Hößl",
     author_email="dominichoessl@gmail.com",
     license="",
-    packages=['HD44780_1602_display_matrix'],
+    packages=['1602_display_matrix'],
     install_requires=['smbus2'],
     classifiers=[
         'Development Status :: 3 - Alpha',
