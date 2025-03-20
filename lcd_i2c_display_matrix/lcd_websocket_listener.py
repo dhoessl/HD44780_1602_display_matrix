@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from json import loads
 from json.decoder import JSONDecodeError
 from netifaces import ifaddresses
+from time import sleep
 from .matrix import LCDMatrix
 
 # Example usage:
@@ -25,7 +26,14 @@ class MatrixCommandReceiver:
 
     def _get_lsock(self) -> socket:
         lsock = socket(AF_INET, SOCK_STREAM)
-        lsock.bind((ifaddresses("wlan0")[AF_INET][0]["addr"], 80))
+        connected = False
+        while not connected:
+            try:
+                lsock.bind((ifaddresses("wlan0")[AF_INET][0]["addr"], 80))
+                connected = True
+            except (ValueError, KeyError):
+                sleep(.1)
+                continue
         lsock.listen()
         lsock.setblocking(False)
         return lsock
