@@ -1,14 +1,14 @@
 from setuptools import setup
 
 setup(
-    name='1602_display_matrix',
+    name='lcd_i2c_display_matrix',
     version='0.1.0',
     description='library to manage multiple 1602 LCD displays in a matrix',
     url='https://github.com/dhoessl/HD44780_1602_display_matrix',
     author="Dominic Hößl",
     author_email="dominichoessl@gmail.com",
     license="",
-    packages=['1602_display_matrix'],
+    packages=['lcd_i2c_display_matrix'],
     install_requires=['smbus2'],
     classifiers=[
         'Development Status :: 3 - Alpha',
