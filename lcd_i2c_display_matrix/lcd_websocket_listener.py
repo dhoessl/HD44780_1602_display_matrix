@@ -70,7 +70,7 @@ class MatrixCommandReceiver:
                     continue
                 if "exit" in json_msg and json_msg["exit"]:
                     self.matrix.exit()
-                elif "selftest" in json_msg and json_msg["selfest"]:
+                elif "selftest" in json_msg and json_msg["selftest"]:
                     self.matrix.self_test()
                 elif "print" in json_msg and json_msg["print"]:
                     if "data" not in json_msg:
