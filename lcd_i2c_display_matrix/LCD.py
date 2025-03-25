@@ -43,8 +43,10 @@ class LCD:
         self.lcd_byte(0x33, self.LCD_CMD)  # 110011 Initialise
         self.lcd_byte(0x32, self.LCD_CMD)  # 110010 Initialise
         self.lcd_byte(0x06, self.LCD_CMD)  # 000110 Cursor move direction
-        self.lcd_byte(0x0C, self.LCD_CMD)  # 001100 Display On,Cursor Off, Blink Off
-        self.lcd_byte(0x28, self.LCD_CMD)  # 101000 Data length, number of lines, font size
+        # 001100 Display On,Cursor Off, Blink Off
+        self.lcd_byte(0x0C, self.LCD_CMD)
+        # 101000 Data length, number of lines, font size
+        self.lcd_byte(0x28, self.LCD_CMD)
         self.lcd_byte(0x01, self.LCD_CMD)  # 000001 Clear display
 
     def lcd_byte(self, bits, mode):
