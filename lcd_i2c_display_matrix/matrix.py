@@ -1,121 +1,4 @@
-from .LCD import LCD
-from threading import Thread, Event
-from queue import Queue
-from time import sleep
-
-
-class Display:
-    def __init__(self, identifier: hex, location: tuple) -> None:
-        """
-            Creates the display.
-            location and identifier is given by the matrix via user input.
-            locked_display and data_id is used by the matrix to decide if it
-            is the correct display to display text on.
-            A msg queue and thread is created to deliver message in realtime to
-            the board.
-        """
-        self.identifier = identifier
-        self.location = location
-        self.lcd = LCD(2, self.identifier, True)
-        self.locked_display = False
-        self.data_id = None
-        self.msg_queue = Queue()
-        self.thread = Thread(
-            target=self.display_thread,
-            args=()
-        )
-        self.thread_exit = Event()
-        self.thread.start()
-
-    def create_display(self) -> LCD:
-        """ NOTE: currently not used"""
-        if self.identifier not in list(range(0x20, 0x28)):
-            return None
-        return LCD(2, self.identifier, False)
-
-    def is_on(self) -> bool:
-        """ Check if the Event flag is set"""
-        if self.thread_exit.is_set():
-            return False
-        return True
-
-    def toggle_display(self) -> None:
-        """Toggle display on/off depending on the current state"""
-        if self.is_on():
-            self.turn_off()
-        else:
-            self.turn_on()
-
-    def turn_off(self) -> None:
-        """ Toggle display off by setting Backlight off and setting the
-            Event flag """
-        self.lcd = LCD(2, self.identifier, False)
-        if self.is_on():
-            self.thread_exit.set()
-
-    def turn_on(self) -> None:
-        """ Toggle display on by setting the Backlight to on and removing
-            the Event Flag. Creating a thread to handle displaying data
-        """
-        if not self.is_on():
-            self.lcd = LCD(2, self.identifier, True)
-            self.thread_exit.clear()
-            self.thread = Thread(
-                target=self.display_thread,
-                args=()
-            )
-            self.thread.start()
-
-    def set_long_line(self, text) -> None:
-        """ Split a long line into 2 parts containing 16 chars.
-            All chars beyond 32 will be removed
-        """
-        self.set_text(line1=text[:16], line2=text[16:32])
-
-    def set_text(self, line1: str = None, line2: str = None) -> None:
-        """ Remove all current data from the message queue.
-            Adding the new data to the queue.
-        """
-        while self.msg_queue.qsize() > 0:
-            self.msg_queue.get()
-        self.msg_queue.put([
-            f"{line1}",
-            f"{line2}"
-        ])
-
-    def set_line(self, text: str, line: int = 1) -> None:
-        """ If there is the need to just modify one line of a display
-            this function will deliver the correct line to the set_text
-            function.
-        """
-        if line not in [1, 2]:
-            return
-        if line == 1:
-            self.set_text(line1=text, line2=None)
-        else:
-            self.set_text(line1=None, line2=text)
-
-    def display_thread(self) -> None:
-        """ Thread to set the text of a display.
-            It takes some time to display the text to the display.
-            So while the data is printed new text may be added to the queue.
-            The thread picks it up and displays it after finishing displaying
-            the previous text.
-        """
-        while not self.thread_exit.is_set():
-            current_lines = ["", ""]
-            if self.msg_queue.qsize() > 0:
-                new_lines = self.msg_queue.get()
-                if (new_lines[0] is not None
-                        and current_lines[0] != new_lines[0]):
-                    self.lcd.message(f"{new_lines[0]}", 1)
-                    current_lines[0] = new_lines[0]
-                if (new_lines[1] is not None
-                        and current_lines[1] != new_lines[1]):
-                    self.lcd.message(f"{new_lines[1]}", 2)
-                    current_lines[1] = new_lines[1]
-            else:
-                sleep(.1)
+from .display import Display, LCDIdentifierDoesNotExist
 
 # Example Dict
 # display_data = [
@@ -124,104 +7,179 @@ class Display:
 # ]
 
 
-class LCDMatrix:
-    def __init__(self, display_data: list) -> None:
-        """
-            Create the Matrix.
-            location must be a tuple with containing x, y of the display in
-            the matrix. The identifier is the LCDs controll board identifier
-        """
+class DisplayIndexError(Exception):
+    def __init__(self, *args) -> None:
+        if args:
+            self.index = args[0]
+            self.len_displays = args[1]
+        else:
+            self.index = None
+
+    def __str__(self) -> str:
+        if self.index:
+            return f"{self.index} is not 0 - {self.len_displays}"
+        else:
+            return "Index is not in the list of Displays"
+
+
+class DisplayDataIdError(Exception):
+    def __init__(self, *args) -> None:
+        if args:
+            self.id = args[0]
+        else:
+            self.id = None
+
+    def __str__(self) -> str:
+        return f"Display ID {self.id if self.id else ''} was not " \
+                "found in active displays"
+
+
+class Matrix:
+    def __init__(self, identifiers: list = None) -> None:
         self.displays = []
-        self.get_displays(display_data)
-        self.last_used = self.displays[-1][-1]
+        self.create_displays(identifiers)
+        self.last_used = -1
 
-    def display_on_next(self, lines: list, data_id: str) -> None:
-        """
-            Display text on the next available display.
-            If there is an display already got the same id then use it
-            otherwise use the next unlocked display after the last used one
-        """
-        data_id_display = self.get_data_id_display(data_id)
-        if data_id_display:
-            # Display the text on the already used display
-            data_id_display.set_text(line1=lines[0], line2=lines[1])
-            return
-
-        next_display = self.get_next_unused_display()
-        if not next_display:
-            # No possible next display found.
-            # skip displaying
-            return
-        if next_display:
-            # Display the text on the next available Display
-            # set the correct data_id so it can be found again
-            # set it as the last used one
-            if not next_display.is_on():
-                next_display.toggle_display()
-            next_display.set_text(line1=lines[0], line2=lines[1])
-            next_display.data_id = data_id
-            self.last_used = next_display
-            return
-
-    def get_next_unused_display(self) -> Display:
-        display_list = []
-        for row in self.displays:
-            for display in row:
-                display_list.append(display)
-        tmp_list = []
-        while len(display_list) > 0 and len(tmp_list) < 2:
-            for display in display_list:
-                if display.locked_display:
-                    display_list.remove(display)
-                if len(tmp_list) == 0 and display != self.last_used:
-                    continue
-                tmp_list.append(display)
-        if len(tmp_list) == 1:
-            return None
-        return tmp_list[1]
-
-    def get_data_id_display(self, data_id) -> Display:
-        for row in self.displays:
-            for display in row:
-                if display.data_id == data_id:
-                    return display
-        return None
-
-    def self_test(self) -> None:
-        """ Selftesting
-            Display Identifier on first line
-            Display location on second lin
-        """
-        for row in self.displays:
-            for display in row:
-                if not display.is_on():
-                    display.toggle_display()
-                display.set_text(
-                    line1=f"ID : {hex(display.identifier)}",
-                    line2=f"Loc: {display.location}"
+    def create_displays(self, identifiers: list) -> None:
+        """ Creates all displays provided in the identifiers list. """
+        for identifier in identifiers:
+            try:
+                self.displays.append(Display(identifier))
+            except LCDIdentifierDoesNotExist:
+                print(
+                    f"Identifier {identifier} is not a valid identifier!"
+                    "Skipping this display"
                 )
 
-    def get_displays(self, setup_data: list) -> None:
-        """
-            Init all displays. If there are spots without a display on the
-            grid its value will be set to `None`.
-        """
-        for display in setup_data:
-            if "identifier" not in display or "location" not in display:
-                # NOTE: if identifier or location is missing just continue
+    def exit(self) -> None:
+        """ Turns of Backlight for every display. """
+        for display in self.displays:
+            if display.is_on():
+                display.toggle_display()
+
+    def self_test(self) -> None:
+        """ Displays Identifier and position in list for every display. """
+        for display in self.displays:
+            if not display.is_on():
                 continue
-            x, y = display["location"]
-            while len(self.displays) < x + 1:
-                self.displays.append([])
-            while len(self.displays[x]) < y + 1:
-                self.displays[x].append(None)
-            self.displays[x][y] = Display(
-                display["identifier"],
-                display["location"],
+            display.set_text(
+                f"ID:    {hex(display.indentifier)}",
+                f"Index: {self.displays.index(display)}"
             )
 
-    def exit(self) -> None:
-        for row in self.displays:
-            for display in row:
-                if display.is_on():
-                    display.toggle_display()
+    def find_data_id_display(self, id) -> Display:
+        """ search self.displays for a display with the set id as data_id. """
+        for display in self.displays:
+            if display.data_id == id:
+                return display
+        return None
+
+    def display_on_id(self, lines: list, data_id: str) -> bool:
+        """ Displays some text on a display using the data_id and the provided
+            lines list [line1, line2]
+        """
+        id_display = self.find_data_id_display(data_id)
+        if id_display:
+            id_display.set_text(lines[0], lines[1])
+            return True
+        return False
+
+    def find_next_free_display(self) -> Display:
+        """ Search self.display for the next unlocked display """
+        displays_to_check = list(range(self.last_used + 1, len(self.displays)))
+        displays_to_check += list(range(0, self.last_used + 1))
+        for index in displays_to_check:
+            if self.displays[index].locked:
+                continue
+            return self.displays[index]
+        return None
+
+    def display_on_next(self, lines: list, data_id: str) -> None:
+        """ Displays some text provided by lines [line1, line2]. """
+        next_display = self.find_next_free_display()
+        if not next_display:
+            # No unlocked active display found
+            # Return without displaying the data
+            return
+        if not next_display.is_on():
+            next_display.toggle_display()
+        next_display.set_text(lines[0], lines[1])
+        next_display.data_id = data_id
+        self.last_used = self.displays.index(next_display)
+
+    def display_on_next_or_id(self, lines: list, data_id) -> None:
+        """ Tries to write data on a display with the provided data_id.
+            If the display does not exist, then the next unlocked display is
+            searched and written on
+        """
+        if self.display_on_id(lines, data_id):
+            return
+        self.display_on_next(lines, data_id)
+
+    def lock_display(self, index: int = None, id: str = None) -> None:
+        """ Locks a display specified by data_id or the index in the list.
+            This class might just write on the locked displays if providing
+            the exact data_id
+        """
+        display = None
+        if id:
+            display = self.find_data_id_display(id)
+        elif index and index in range(len(self.displays)):
+            display = self.displays[index]
+        if not display or display.locked:
+            return
+        display.locked = True
+
+    def unlock_display(self, index: int = None, id: str = None) -> None:
+        """ Unlocks previously locked display.
+            Can be unlocked using data_id or the index of the display
+            in the self.displays list
+        """
+        display = None
+        if id:
+            display = self.find_data_id_display(id)
+        elif index and index in range(len(self.displays)):
+            display = self.displays[index]
+        if not display or not display.locked:
+            return
+        display.locked = False
+
+    def display_and_shift(self, lines: list, id: str = None) -> None:
+        """ Add new text to the first display which is not a maintainance
+            or locked display.
+            All displays will be shifted by one.
+        """
+        for display in self.displays:
+            if display.data_id == "maintainance" or display.locked:
+                continue
+            old_lines = display.current_lines
+            if not display.is_on():
+                display.toggle_display()
+            old_id = display.data_id
+            display.set_text(lines[0], lines[1])
+            display.data_id = id
+            lines = old_lines
+            id = old_id
+        # next_display.set_text(lines[0], lines[1])
+
+# NOTE: Display switching is work in progess and currently not needed that much
+#
+#     def switch_position_by_index(self, src: int, dest: int) -> None:
+#         if src not in range(len(self.displays)):
+#             raise DisplayIndexError(src)
+#         if dest not in range(len(self.displays)):
+#             raise DisplayIndexError(dest)
+#         self.switch_position(self.displays[src], self.displays[dest])
+#
+#     def switch_position_by_id(self, src: str, dest: str) -> None:
+#         if not self.find_data_id_display(src):
+#             raise DisplayDataIdError(src)
+#         if not self.find_data_id_display(dest):
+#             raise DisplayDataIdError(dest)
+#         self.switch_position(
+#             self.find_data_id_display(src),
+#             self.find_data_id_display(dest)
+#         )
+#
+#     def switch_position(self, src: Display, dest: Display) -> None:
+#         pass
