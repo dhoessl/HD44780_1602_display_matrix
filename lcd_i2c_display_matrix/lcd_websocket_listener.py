@@ -5,7 +5,7 @@ from json import loads
 from json.decoder import JSONDecodeError
 from netifaces import ifaddresses
 from time import sleep
-from .matrix import LCDMatrix
+from .matrix import Matrix as LCDMatrix
 
 # Example usage:
 # if __name__ == "__main__":
@@ -72,12 +72,37 @@ class MatrixCommandReceiver:
                     self.matrix.exit()
                 elif "selftest" in json_msg and json_msg["selftest"]:
                     self.matrix.self_test()
+                elif "lock" in json_msg and json_msg["lock"]:
+                    if "data" not in json_msg:
+                        continue
+                    if "id" in json_msg["data"]:
+                        self.matrix.lock_display(id=json_msg["data"]["id"])
+                    elif "index" in json_msg["data"]:
+                        self.matrix.lock_display(
+                            index=json_msg["data"]["index"]
+                        )
+                elif "unlock" in json_msg and json_msg["unlock"]:
+                    if "data" not in json_msg:
+                        continue
+                    if "id" in json_msg["data"]:
+                        self.matrix.unlock_display(
+                            id=json_msg["data"]["id"]
+                        )
+                    elif "index" in json_msg["data"]:
+                        self.matrix.unlock_display(
+                            id=json_msg["data"]["index"]
+                        )
                 elif "print" in json_msg and json_msg["print"]:
                     if "data" not in json_msg:
                         # no data key was send
                         continue
                     if json_msg["print"] == "on_next":
                         self.matrix.display_on_next(
+                            json_msg["data"]["lines"],
+                            json_msg["data"]["id"]
+                        )
+                    if json_msg["print"] == "shift":
+                        self.matrix.display_and_shift(
                             json_msg["data"]["lines"],
                             json_msg["data"]["id"]
                         )
