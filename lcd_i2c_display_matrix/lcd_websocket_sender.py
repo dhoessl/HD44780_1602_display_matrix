@@ -29,6 +29,46 @@ class MatrixCommandSender:
         })
         self.use_socket(output)
 
+    def lock_by_id(self, id: str) -> None:
+        self.use_socket(
+            dumps({
+                "lock": True,
+                "data": {
+                    "id": id
+                }
+            })
+        )
+
+    def lock_by_index(self, index: int) -> None:
+        self.use_socket(
+            dumps({
+                "lock": True,
+                "data": {
+                    "index": index
+                }
+            })
+        )
+
+    def unlock_by_id(self, id: str) -> None:
+        self.use_socket(
+            dumps({
+                "unlock": True,
+                "data": {
+                    "id": id
+                }
+            })
+        )
+
+    def unlock_by_index(self, index: int) -> None:
+        self.use_socket(
+            dumps({
+                "unlock": True,
+                "data": {
+                    "index": index
+                }
+            })
+        )
+
     def do_selftest(self) -> None:
         self.use_socket(dumps({"selftest": True}))
 
