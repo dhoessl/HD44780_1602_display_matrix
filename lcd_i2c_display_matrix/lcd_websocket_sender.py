@@ -20,6 +20,15 @@ class MatrixCommandSender:
         self.address = address
         self.port = port
 
+    def check_connect(self) -> bool:
+        try:
+            with socket(AF_INET, SOCK_STREAM) as s:
+                s.connect((self.address, self.port))
+                s.sendall(("\n\n").encode("UTF-8"))
+            return True
+        except OSError:
+            return False
+
     def send(self, command: str, lines: list, id: str) -> None:
         output = dumps({
             "print": command,
