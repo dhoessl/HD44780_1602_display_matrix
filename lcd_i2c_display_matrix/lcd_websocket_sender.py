@@ -1,5 +1,6 @@
 from socket import socket, AF_INET, SOCK_STREAM
 from json import dumps
+from random import choice
 
 # Exmaple Usage:
 # if __name__ == "__main__":
@@ -28,6 +29,50 @@ class MatrixCommandSender:
             }
         })
         self.use_socket(output)
+
+    def diplay_on_id(self, lines: list, id: str) -> None:
+        self.use_socket(
+            dumps({
+                "on_id": True,
+                "data": {
+                    "lines": lines,
+                    "id": id
+                }
+            })
+        )
+
+    def display_on_next(self, lines: list, id: str = None) -> None:
+        self.use_socket(
+            dumps({
+                "on_next": True,
+                "data": {
+                    "lines": lines,
+                    "id": id if id else choice(range(0, 1000))
+                }
+            })
+        )
+
+    def display_on_next_or_id(self, lines: list, id: str) -> None:
+        self.use_socket(
+            dumps({
+                "on_next_or_id": True,
+                "data": {
+                    "lines": lines,
+                    "id": id
+                }
+            })
+        )
+
+    def display_on_shift(self, lines: list, id: str = None) -> None:
+        self.use_socket(
+            dumps({
+                "on_shift": True,
+                "data": {
+                    "lines": lines,
+                    "id": id
+                }
+            })
+        )
 
     def lock_by_id(self, id: str) -> None:
         self.use_socket(

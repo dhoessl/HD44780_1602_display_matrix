@@ -96,12 +96,22 @@ class MatrixCommandReceiver:
                     if "data" not in json_msg:
                         # no data key was send
                         continue
+                    if json_msg["print"] == "on_id":
+                        self.matrix.display_on_id(
+                            json_msg["data"]["lines"],
+                            json_msg["data"]["id"]
+                        )
                     if json_msg["print"] == "on_next":
                         self.matrix.display_on_next(
                             json_msg["data"]["lines"],
                             json_msg["data"]["id"]
                         )
-                    if json_msg["print"] == "shift":
+                    if json_msg["print"] == "on_next_or_id":
+                        self.matrix.display_on_next_or_id(
+                            json_msg["data"]["lines"],
+                            json_msg["data"]["id"]
+                        )
+                    if json_msg["print"] == "on_shift":
                         self.matrix.display_and_shift(
                             json_msg["data"]["lines"],
                             json_msg["data"]["id"]
