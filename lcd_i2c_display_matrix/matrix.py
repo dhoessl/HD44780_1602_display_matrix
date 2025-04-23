@@ -63,7 +63,7 @@ class Matrix:
             if not display.is_on():
                 continue
             display.set_text(
-                f"ID:    {hex(display.indentifier)}",
+                f"ID:    {hex(display.identifier)}",
                 f"Index: {self.displays.index(display)}"
             )
 
